@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  web:
+    environment: 
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    build: .
+    ports:
+      - "8000:5000"
+    depends_on:
+      - postgres
+  postgres:
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    image: "postgres:alpine"
+    ports:
+      - "5432:5432"
