@@ -68,19 +68,56 @@ def add_paper(data):
     
     return
 
-r = add_paper({ 
-    "id" : "53e99784b7602d9701f3e3f5", 
-    "title" : "3GIO.", 
-    "venue" : {
-        "_id" : "sdksd",
-        "name" : "CVPR"
-    }, 
-    "year" : 2011, 
-    "keywords" : ["Cars"], 
-    "n_citation" : 0, 
-    "lang" : "e"
-})
 
-session = create_session()
-papers = session.query(Paper).all()
-print(papers[0].id)
+def read_paper(id):
+    session = create_session()
+    papers = session.query(Paper).filter(Paper.id == id).all()
+    session.close()
+    if len(papers) > 0:
+        return papers[0]
+    else:
+        return []
+    
+def update_paper(id, data):
+    session = create_session()
+    papers = session.query(Paper).filter(Paper.id == id).all()
+    if len(papers) > 0:
+        pydantic_dict = data.dict()
+        for key in pydantic_dict.keys():
+            update_dict = {key: pydantic_dict[key]}
+            paper.update(update_dict)
+    else:
+        session.close()
+        return
+
+
+def delete_paper(id):
+    session = create_session()
+    papers = session.query(Paper).filter(Paper.id == id).all()
+    if len(papers) > 0:
+        session.delete(papers[0])
+        session.commit()
+    session.close()
+
+    return
+
+if __name__ == "__main__":
+    
+    r = add_paper({ 
+        "id" : "53e99784b7602d9701f3e3f5", 
+        "title" : "3GIO.", 
+        "venue" : {
+            "_id" : "sdksd",
+            "name" : "CVPR"
+        }, 
+        "year" : 2011, 
+        "keywords" : ["Cars"], 
+        "n_citation" : 0, 
+        "lang" : "e"
+    })
+
+    print(read_paper("53e99784b7602d9701f3e3f5"))
+
+    session = create_session()
+    papers = session.query(Paper).all()
+    print(papers)

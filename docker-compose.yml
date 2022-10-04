@@ -3,7 +3,7 @@ services:
   web:
     environment: 
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    build: .
+    build: backend/
     ports:
       - "8000:5000"
     depends_on:
