@@ -1,4 +1,4 @@
 #!/bin/bash
 
 python3 db/create_tables.py
-python3 db/db_utils.py
+uvicorn main:app --host 0.0.0.0 --port 8000

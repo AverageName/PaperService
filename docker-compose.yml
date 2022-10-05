@@ -5,9 +5,10 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     build: backend/
     ports:
-      - "8000:5000"
+      - "5001:8000"
     depends_on:
       - postgres
+    command: ./entrypoint.sh
   postgres:
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}

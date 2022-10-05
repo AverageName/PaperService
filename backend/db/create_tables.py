@@ -72,9 +72,9 @@ class Paper(Base):
     #references = relationship("Paper", secondary=paper_paper, back_populates='references')
 
 
-engine = create_engine(f"postgresql+psycopg2://postgres:{os.environ['POSTGRES_PASSWORD']}@postgres/papers")
-if not database_exists(engine.url):
-    create_database(engine.url)
-engine.connect()
-Base.metadata.create_all(engine)
-
+if __name__ == "__main__":
+    engine = create_engine(f"postgresql+psycopg2://postgres:{os.environ['POSTGRES_PASSWORD']}@postgres/papers")
+    if not database_exists(engine.url):
+        create_database(engine.url)
+    engine.connect()
+    Base.metadata.create_all(engine)

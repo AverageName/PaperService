@@ -1,5 +1,6 @@
-from sqlalchemy import insert, select
-from create_tables import *
+import os
+from sqlalchemy import insert, select, create_engine
+from db.create_tables import Paper, Author, Venue, Lang, Keyword
 from sqlalchemy.orm import Session, sessionmaker
 
 
@@ -69,7 +70,7 @@ def add_paper(data):
     return
 
 
-def read_paper(id):
+def read_paper_db(id):
     session = create_session()
     papers = session.query(Paper).filter(Paper.id == id).all()
     session.close()
