@@ -1,15 +1,32 @@
 from pydantic import BaseModel
-from typing import List
+
+
+class Author(BaseModel):
+    id: str
+    name: str
+
+
+class Venue(BaseModel):
+    id: str
+    name: str
+
+
+class Lang(BaseModel):
+    name: str
+
+
+class Keyword(BaseModel):
+    name: str
 
 
 class Paper(BaseModel):
     id: str
     title: str
     year: int
-    authors: List[dict]
-    venue: dict
+    authors: list[Author]
+    venue: Venue
     n_citations: int
-    keywords: List[str]
+    keywords: list[str]
     abstract: str
     url: str
     lang: str
