@@ -3,6 +3,7 @@ services:
   web:
     environment: 
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - TOKEN=${TOKEN}
     build: backend/
     ports:
       - "5001:8000"

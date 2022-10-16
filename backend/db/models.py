@@ -1,7 +1,8 @@
 from sqlalchemy import Table, String, Integer, Column, ForeignKey
 from sqlalchemy.orm import relationship
-from database import Base
+from sqlalchemy.ext.declarative import declarative_base
 
+Base = declarative_base()
 
 paper_author = Table('paper_author', Base.metadata,
                      Column('paper_id', ForeignKey('paper.id'), primary_key=True),
@@ -62,3 +63,10 @@ class Paper(Base):
     lang_name = Column(String(100), ForeignKey("lang.name"))
     lang = relationship("Lang", back_populates="papers")
     # references = relationship("Paper", secondary=paper_paper, back_populates='references')
+
+
+class User(Base):
+    __tablename__ = 'user'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    login = Column(String(100), nullable=False)
+    password = Column(String(100), nullable=False)
