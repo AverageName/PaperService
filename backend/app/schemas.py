@@ -11,14 +11,15 @@ class Venue(BaseModel):
     name: str
 
 
-class Lang(BaseModel):
-    name: str
-
-
 class Keyword(BaseModel):
-    name: str
+    id: str
 
 
+class Lang(BaseModel):
+    id: str
+
+
+# to do: define typing.Optional values
 class Paper(BaseModel):
     id: str
     title: str
@@ -26,7 +27,7 @@ class Paper(BaseModel):
     authors: list[Author]
     venue: Venue
     n_citations: int
-    keywords: list[str]
+    keywords: list[Keyword]
     abstract: str
     url: str
-    lang: str
+    lang: Lang

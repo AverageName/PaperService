@@ -1,14 +1,13 @@
-from fastapi import FastAPI, status, HTTPException, Depends
-from sqlalchemy.orm import Session
-import schemas
-from database import Base, engine, SessionLocal
 import crud
+from database import Base, SessionLocal, engine
+from fastapi import Depends, FastAPI, status
+from sqlalchemy.orm import Session
+
+import schemas
 
 Base.metadata.create_all(engine)
 
 app = FastAPI()
-
-# Helper function to get database session
 
 
 def get_session():
@@ -26,22 +25,22 @@ def root():
 
 @app.post("/paper", status_code=status.HTTP_201_CREATED)
 def create_paper(paper: schemas.Paper, session: Session = Depends(get_session)):
-    crud.create_paper(paper.dict(), session)
+    crud.create_paper(paper, session)
     return f"created paper with id: {paper.id}"
 
 
-@app.get("/paper/{id}")
-def read_paper(id: str, session: Session = Depends(get_session)):
-    return crud.read_paper(id, session)
+@app.get("/paper/{paper_id}")
+def read_paper(paper_id, session: Session = Depends(get_session)):
+    return crud.read_by_id(paper_id, "paper", session)
 
 
-@app.put("/paper/{id}")
-def update_paper(id: str, update_data: dict, session: Session = Depends(get_session)):
-    crud.update_paper(id, update_data, session)
-    return f"updated paper with id: {id}"
+@app.put("/paper/{paper_id}")
+def update_paper(paper_id, new_values: dict, session: Session = Depends(get_session)):
+    crud.update_by_id(paper_id, new_values, "paper", session)
+    return f"updated paper with id: {paper_id}"
 
 
-@app.delete("/paper/{id}")
-def delete_paper(id: str, session: Session = Depends(get_session)):
-    crud.delete_paper(id, session)
-    return "deleted paper with id: {id}"
+@app.delete("/paper/{paper_id}")
+def delete_paper(paper_id, session: Session = Depends(get_session)):
+    crud.delete_by_id(paper_id, "paper", session)
+    return f"deleted paper with id: {paper_id}"
