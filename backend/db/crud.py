@@ -1,98 +1,119 @@
 import sys
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from models import Paper, Author, Venue, Lang, Keyword, User
+import models
+import schemas
 
 
-def create_paper(data: dict, session):
-    id = data.get("id", None)
-    if id is None:
-        return
+def create_by_id(schema, model, session: Session):
+    entry = session.query(model).filter_by(id=schema.id).one_or_none()
+    if not entry:
+        entry = model(**schema.dict())
+        session.add(entry)
+        session.commit()
 
-    paper = session.query(Paper).filter_by(id=id).one_or_none()
-    if paper:
-        return
+    return entry
 
-    paper = Paper(id=id,
-                  title=data.get('title', ''),
-                  year=data.get('year', None),
-                  n_citations=data.get('n_citations', 0),
-                  abstract=data.get('abstract', ''),
-                  url=data.get('url', ''),
-                  )
 
-    if 'authors' in data:
-        author_entries = []
-        for author_data in data['authors']:
-            author_id = author_data['id']
-            author_entry = session.query(Author).filter_by(id=author_id).one_or_none()
-            if not author_entry:
-                author_entry = Author(id=author_id, name=author_data['name'])
+def create_many_by_id(schemas: list, model, session: Session):
+    return [create_by_id(schema, model, session) for schema in schemas]
 
-            author_entries.append(author_entry)
 
-        paper.authors = author_entries
+def create_paper(paper: schemas.Paper, session) -> models.Paper:
+    entry = session.query(models.Paper).filter_by(id=paper.id).one_or_none()
+    if not entry:
+        entry = models.Paper(
+            id=paper.id,
+            title=paper.title,
+            year=paper.year,
+            authors=create_many_by_id(paper.authors, models.Author, session),
+            venue=create_by_id(paper.venue, models.Venue, session),
+            n_citations=paper.n_citations,
+            keywords=create_many_by_id(paper.keywords, models.Keyword, session),
+            abstract=paper.abstract,
+            url=paper.url,
+            lang=create_by_id(paper.lang, models.Lang, session),
+        )
+        session.add(entry)
+        session.commit()
 
-    if 'venue' in data:
-        venue_id = data['venue']['id']
-        venue = session.query(Venue).filter_by(id=venue_id).one_or_none()
-        if not venue:
-            venue = Venue(id=venue_id, name=data['venue']['name'])
+    return entry
 
-        paper.venue = venue
 
-    if 'lang' in data:
-        lang_name = data['lang']
-        lang = session.query(Lang).filter_by(name=lang_name).one_or_none()
-        if not lang:
-            lang = Lang(name=lang_name)
+def throw_not_found(entry_id):
+    raise HTTPException(
+        status_code=404, detail=f"entry with id: {entry_id} is not found"
+    )
 
-        paper.lang = lang
 
-    if 'keywords' in data:
-        keywords = []
-        for keyword in data['keywords']:
-            keyword_entry = session.query(Keyword).filter_by(name=keyword).one_or_none()
-            if not keyword_entry:
-                keyword_entry = Keyword(name=keyword)
-            keywords.append(keyword_entry)
+def get_table(table_name: str):
+    if table_name == "paper":
+        return models.Paper
+    if table_name == "author":
+        return models.Author
+    if table_name == "venue":
+        return models.Venue
+    if table_name == "keyword":
+        return models.Keyword
+    if table_name == "lang":
+        return models.Lang
 
-        paper.keywords = keywords
+    raise HTTPException(status_code=404, detail=f"table: {table_name} not found")
 
-    session.add(paper)
+
+def read_by_id(entry_id, table_name: str, session: Session):
+    entry = session.query(get_table(table_name)).filter_by(id=entry_id).one_or_none()
+    if not entry:
+        throw_not_found(entry_id)
+
+    return entry
+
+
+def create_attribute_value(attribute, value, session):
+    if attribute == "authors":
+        return create_many_by_id(
+            [schemas.Author(**author) for author in value], models.Author, session
+        )
+    if attribute == "venue":
+        return create_by_id(schemas.Venue(**value), models.Venue, session)
+    if attribute == "keywords":
+        return create_many_by_id(
+            [schemas.Keyword(**keyword) for keyword in value], models.Keyword, session
+        )
+    if attribute == "lang":
+        return create_by_id(schemas.Lang(**value), models.Lang, session)
+
+    return value
+
+
+def update_by_id(entry_id, new_values: dict, table_name: str, session: Session):
+    entry = session.query(get_table(table_name)).filter_by(id=entry_id).one_or_none()
+    if not entry:
+        throw_not_found(entry_id)
+
+    for attribute, new_value in new_values.items():
+        if not hasattr(entry, attribute):
+            raise HTTPException(
+                status_code=400, detail=f"entry does not have attribute: {attribute}"
+            )
+
+        # this is currently the only table that has attributes that are themselves tables
+        if table_name == "paper":
+            setattr(
+                entry, attribute, create_attribute_value(attribute, new_value, session)
+            )
+        else:
+            setattr(entry, attribute, new_value)
 
     session.commit()
 
 
-def read_paper(id, session):
-    paper = session.query(Paper).filter_by(id=id).one_or_none()
-    if not paper:
-        raise HTTPException(status_code=404, detail=f"paper with id {id} not found")
+def delete_by_id(entry_id, table_name: str, session: Session):
+    entry = session.query(get_table(table_name)).filter_by(id=entry_id).one_or_none()
+    if not entry:
+        throw_not_found(entry_id)
 
-    return paper
-
-
-def update_paper(id, update_data: dict, session):
-    paper = session.query(Paper).filter_by(id=id).one_or_none()
-    if not paper:
-        raise HTTPException(status_code=404, detail=f"paper with id {id} not found")
-
-    for key, value in update_data.items():
-        if hasattr(paper, key):
-            # to do: add proper updaters (those that create Lang, Keyword, ... entries)
-            # currently updating paper.lang throws an error
-            setattr(paper, key, value)
-
-    session.commit()
-
-
-def delete_paper(id, session):
-    paper = session.query(Paper).filter_by(id=id).one_or_none()
-    if not paper:
-        raise HTTPException(status_code=404, detail=f"paper with id {id} not found")
-
-    session.delete(paper)
-
+    session.delete(entry)
     session.commit()
 
 
