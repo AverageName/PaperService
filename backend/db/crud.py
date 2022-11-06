@@ -1,22 +1,44 @@
 import sys
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-import models
-import schemas
+
+from . import models, schemas
 
 
-def create_by_id(schema, model, session: Session):
-    entry = session.query(model).filter_by(id=schema.id).one_or_none()
+def create_by_str(datum: str, model, session: Session):
+    entry = session.query(model).filter_by(id=datum).one_or_none()
     if not entry:
-        entry = model(**schema.dict())
+        # str models store their value as .id
+        entry = model(id=datum)
         session.add(entry)
         session.commit()
 
     return entry
 
 
-def create_many_by_id(schemas: list, model, session: Session):
-    return [create_by_id(schema, model, session) for schema in schemas]
+def create_by_id(datum, model, session: Session):
+    entry = session.query(model).filter_by(id=datum.id).one_or_none()
+    if not entry:
+        entry = model(**datum.dict())
+        session.add(entry)
+        session.commit()
+
+    return entry
+
+
+def create_many_by_str(data: set[str], model, session: Session):
+    return [create_by_str(datum, model, session) for datum in data]
+
+
+def create_many_by_id(data: list, model, session: Session):
+    ids_left_to_create = {datum.id for datum in data}
+    created_entries = []
+    for datum in data:
+        if datum.id in ids_left_to_create:
+            created_entries.append(create_by_id(datum, model, session))
+            ids_left_to_create.remove(datum.id)
+
+    return created_entries
 
 
 def create_paper(paper: schemas.Paper, session) -> models.Paper:
@@ -26,14 +48,20 @@ def create_paper(paper: schemas.Paper, session) -> models.Paper:
             id=paper.id,
             title=paper.title,
             year=paper.year,
-            authors=create_many_by_id(paper.authors, models.Author, session),
-            venue=create_by_id(paper.venue, models.Venue, session),
             n_citations=paper.n_citations,
-            keywords=create_many_by_id(paper.keywords, models.Keyword, session),
             abstract=paper.abstract,
             url=paper.url,
-            lang=create_by_id(paper.lang, models.Lang, session),
         )
+
+        if paper.authors:
+            entry.authors = create_many_by_id(paper.authors, models.Author, session)
+        if paper.venue:
+            entry.venue = create_by_id(paper.venue, models.Venue, session)
+        if paper.keywords:
+            entry.keywords = create_many_by_str(set(paper.keywords), models.Keyword, session)
+        if paper.lang:
+            entry.lang = create_by_str(paper.lang, models.Lang, session)
+
         session.add(entry)
         session.commit()
 
@@ -41,9 +69,7 @@ def create_paper(paper: schemas.Paper, session) -> models.Paper:
 
 
 def throw_not_found(entry_id):
-    raise HTTPException(
-        status_code=404, detail=f"entry with id: {entry_id} is not found"
-    )
+    raise HTTPException(status_code=404, detail=f"entry with id: {entry_id} is not found")
 
 
 def get_table(table_name: str):
@@ -77,11 +103,9 @@ def create_attribute_value(attribute, value, session):
     if attribute == "venue":
         return create_by_id(schemas.Venue(**value), models.Venue, session)
     if attribute == "keywords":
-        return create_many_by_id(
-            [schemas.Keyword(**keyword) for keyword in value], models.Keyword, session
-        )
+        return create_many_by_str(value, models.Keyword, session)
     if attribute == "lang":
-        return create_by_id(schemas.Lang(**value), models.Lang, session)
+        return create_by_str(value, models.Lang, session)
 
     return value
 
@@ -99,9 +123,7 @@ def update_by_id(entry_id, new_values: dict, table_name: str, session: Session):
 
         # this is currently the only table that has attributes that are themselves tables
         if table_name == "paper":
-            setattr(
-                entry, attribute, create_attribute_value(attribute, new_value, session)
-            )
+            setattr(entry, attribute, create_attribute_value(attribute, new_value, session))
         else:
             setattr(entry, attribute, new_value)
 
@@ -118,11 +140,11 @@ def delete_by_id(entry_id, table_name: str, session: Session):
 
 
 def create_user(data, session):
-    user = session.query(User).filter_by(login=data['login']).one_or_none()
+    user = session.query(models.User).filter_by(login=data['login']).one_or_none()
     if user is not None:
         raise HTTPException(status_code=404, detail=f"User with this login already exists")
 
-    user = User(login=data['login'], password=data['password'])
+    user = models.User(login=data['login'], password=data['password'])
     
     session.add(user)
     print("User has been created", file=sys.stderr)

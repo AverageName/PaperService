@@ -9,7 +9,7 @@ services:
       - "5001:8000"
     depends_on:
       - postgres
-    command: ./entrypoint.sh
+    command: /entrypoint.sh
   postgres:
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
