@@ -140,12 +140,12 @@ def delete_by_id(entry_id, table_name: str, session: Session):
 
 
 def create_user(data, session):
-    user = session.query(models.User).filter_by(login=data['login']).one_or_none()
+    user = session.query(models.User).filter_by(login=data["login"]).one_or_none()
     if user is not None:
-        raise HTTPException(status_code=404, detail=f"User with this login already exists")
+        raise HTTPException(status_code=404, detail="User with this login already exists")
 
-    user = models.User(login=data['login'], password=data['password'])
-    
+    user = models.User(login=data["login"], password=data["password"])
+
     session.add(user)
     print("User has been created", file=sys.stderr)
     session.commit()
