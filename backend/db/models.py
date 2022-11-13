@@ -1,8 +1,7 @@
 from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
 
-Base = declarative_base()
+from .database import Base
 
 paper_author = Table(
     "paper_author",
@@ -31,14 +30,14 @@ paper_paper = Table(
 class Author(Base):
     __tablename__ = "author"
     id = Column(String(100), primary_key=True)
-    name = Column(String(100))
+    name = Column(String(100), nullable=True)
     papers = relationship("Paper", secondary=paper_author, back_populates="authors")
 
 
 class Venue(Base):
     __tablename__ = "venue"
     id = Column(String(100), primary_key=True)
-    name = Column(String(100))
+    name = Column(String(200), nullable=True)
     papers = relationship("Paper", back_populates="venue")
 
 
@@ -50,7 +49,7 @@ class Lang(Base):
 
 class Keyword(Base):
     __tablename__ = "keyword"
-    id = Column(String(100), primary_key=True)
+    id = Column(String(1_000), primary_key=True)
     papers = relationship("Paper", secondary=paper_keyword, back_populates="keywords")
 
 
@@ -62,10 +61,11 @@ class Paper(Base):
     authors = relationship("Author", secondary=paper_author, back_populates="papers")
     venue_id = Column(String(100), ForeignKey("venue.id"))
     venue = relationship("Venue", back_populates="papers")
-    n_citations = Column(Integer, default=0)
+    n_citations = Column(Integer, nullable=True)
     keywords = relationship("Keyword", secondary=paper_keyword, back_populates="papers")
-    abstract = Column(String(1000), nullable=True)
-    url = Column(String(500), nullable=True)
+    abstract = Column(String(100_000), nullable=True)
+    # to do: think about dropping it, it takes too much space
+    url = Column(String(1_000_000), nullable=True)
     lang_id = Column(String(100), ForeignKey("lang.id"))
     lang = relationship("Lang", back_populates="papers")
     # references = relationship("Paper", secondary=paper_paper, back_populates='references')
