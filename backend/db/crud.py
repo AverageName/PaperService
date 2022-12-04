@@ -1,7 +1,7 @@
 import sys
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-
+from topic_modeling.predict import predict_topic
 from . import models, schemas
 
 
@@ -44,6 +44,8 @@ def create_many_by_id(data: list, model, session: Session):
 def create_paper(paper: schemas.Paper, session) -> models.Paper:
     entry = session.query(models.Paper).filter_by(id=paper.id).one_or_none()
     if not entry:
+        topics = predict_topic(paper.title)
+        print(topics, file=sys.stderr)
         entry = models.Paper(
             id=paper.id,
             title=paper.title,
@@ -51,6 +53,7 @@ def create_paper(paper: schemas.Paper, session) -> models.Paper:
             n_citations=paper.n_citations,
             abstract=paper.abstract,
             url=paper.url,
+            topic=topics[1]
         )
 
         if paper.authors:
@@ -139,12 +142,12 @@ def delete_by_id(entry_id, table_name: str, session: Session):
     session.commit()
 
 
-def create_user(data, session):
-    user = session.query(models.User).filter_by(login=data["login"]).one_or_none()
+def create_user(tg_id, session):
+    user = session.query(models.User).filter_by(tg_id=tg_id).one_or_none()
     if user is not None:
         raise HTTPException(status_code=404, detail="User with this login already exists")
 
-    user = models.User(login=data["login"], password=data["password"])
+    user = models.User(tg_id=tg_id)
 
     session.add(user)
     print("User has been created", file=sys.stderr)

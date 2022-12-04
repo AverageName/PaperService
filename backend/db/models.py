@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Table
+from sqlalchemy import Column, ForeignKey, Integer, String, Table, BigInteger
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -32,6 +32,9 @@ class Author(Base):
     id = Column(String(100), primary_key=True)
     name = Column(String(100), nullable=True)
     papers = relationship("Paper", secondary=paper_author, back_populates="authors")
+
+    def as_dict(self):
+        return {c: getattr(self, c) for c in ["name"]}
 
 
 class Venue(Base):
@@ -68,11 +71,18 @@ class Paper(Base):
     url = Column(String(1_000_000), nullable=True)
     lang_id = Column(String(100), ForeignKey("lang.id"))
     lang = relationship("Lang", back_populates="papers")
+    topic = Column(String(1_000), nullable=True)
     # references = relationship("Paper", secondary=paper_paper, back_populates='references')
+
+    def as_dict(self):
+        dict_ = {c: getattr(self, c) for c in ["title", "year", "n_citations", "topic"]}
+        dict_["authors"] = []
+        for author in self.authors:
+            dict_["authors"].append(author.as_dict())
+        return dict_
 
 
 class User(Base):
     __tablename__ = "user"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    login = Column(String(100), nullable=False)
-    password = Column(String(100), nullable=False)
+    tg_id = Column(Integer, nullable=False)

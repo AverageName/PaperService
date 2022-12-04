@@ -33,6 +33,7 @@ def remove_incomplete_attributes(paper: dict):
 
 async def parse_and_add_to_database(filename, session):
     json_file = await aiofiles.open(filename, "r")
+    counter = 0
     async for paper in ijson.items(json_file, "item"):
         remove_incomplete_attributes(paper)
 
@@ -40,6 +41,10 @@ async def parse_and_add_to_database(filename, session):
         # (there could be some problems with multithreading
         # if we use the same session for every paper)
         crud.create_paper(schemas.Paper(**paper), session)
+        counter += 1
+        print(counter)
+        if counter == 100:
+            break
 
 
 def fill_database(json_file):
@@ -61,7 +66,7 @@ def fill_database(json_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("filename", default="dblpv13.json")
+    parser.add_argument("--filename", default="dblpv13.json")
     args = parser.parse_args()
     print(args.filename)
 

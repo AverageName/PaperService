@@ -25,3 +25,4 @@ class Paper(BaseModel):
     # to do: think about storing a list in the model in a better way
     url: Optional[list[str]]
     lang: Optional[str]
+    topic: Optional[str]

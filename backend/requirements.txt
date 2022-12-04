@@ -8,3 +8,5 @@ aiogram==2.22.2
 aiofiles
 ijson
 asyncio
+nltk
+sentence-transformers

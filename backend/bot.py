@@ -1,14 +1,13 @@
 import logging
 import os
 import sys
+import pprint
 from aiogram import Bot, Dispatcher, types
 from aiogram.utils import executor
-from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from db.crud import create_user
 from db.database import Base, engine, get_session
-from db.db_utils import login, check_user_exists
+from db.db_utils import *
 
 API_TOKEN = os.environ["TOKEN"]
 
@@ -23,56 +22,55 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
 
-class Form(StatesGroup):
-    logged_in = State()
-
-
 @dp.message_handler(commands=["start", "help"])
-async def send_welcome(message: types.Message, state: FSMContext):
+async def send_welcome(message: types.Message):
     """
     This handler will be called when user sends `/start` or `/help` command
     """
-    await state.update_data(logged_in=False)
-    await message.reply("Hi!\nPlease proceed to sign up or login option")
-
-
-@dp.message_handler(commands=["sign_up", "login"], content_types=[types.ContentType.TEXT])
-async def sign_up(message: types.Message, state: FSMContext):
-    await message.reply(
-        "Write your login and password in the following manner:\n login: password: "
-    )
-
-
-@dp.message_handler(text_contains=["login:", "password:"], content_types=[types.ContentType.TEXT])
-async def create_or_login(message: types.Message, state: FSMContext):
-    async with state.proxy() as curr_state:
-        print(curr_state, file=sys.stderr)
-        if curr_state["logged_in"]:
-            await message.reply("You're already logged in")
-        else:
-            with get_session() as session:
-                text = message.text.split()
-
-                user_data = {}
-                user_data["login"] = text[text.index("login:") + 1]
-                user_data["password"] = text[text.index("password:") + 1]
-
-                if check_user_exists(user_data["login"], session):
-                    logged_in = login(user_data, session)
-                    if not logged_in:
-                        await message.reply("Login or password is wrong")
-                    else:
-                        curr_state["logged_in"] = True
-                else:
-                    create_user(user_data, session)
-                    curr_state["logged_in"] = True
-
-                print(curr_state, file=sys.stderr)
+    await message.reply("""Welcome to paper service bot!\n
+If you want to find paper by some parameter use command /find_by\n
+For example:\n
+/find_by year 2007 \n
+Currently this function supports year/name/topic\n
+If you want to find top-10 referenced authors in certain topic use command /top_10_authors_by_topic\n
+For example: \n
+/top_10_authors_by_topic Computer Science\n
+Amount of answers is limited to 20 for more usability""")
+    with get_session() as session:
+        user = check_user_exists(message.from_user.id, session)
+        if user is None:
+            await message.reply("You are not registered yet, I will add you to my database now")
+            create_user(message.from_user.id)
 
 
 @dp.message_handler(commands=["find_by"], content_types=[types.ContentType.TEXT])
 async def find_by(message: types.Message):
-    pass
+    _, query, value = message.text.split(' ', 2)
+    with get_session() as session:
+        if query == "year":
+            papers = find_by_year(int(value), session)
+        elif query == "name":
+            papers = find_by_author(value, session)
+        elif query == "topic":
+            papers = find_by_topic(value, session)
+    if len(papers):
+        for paper in papers:
+            await message.reply(pprint.pformat(paper, depth=3, indent=4)[1:-1])
+    else:
+        await message.reply("No such papers")
+
+
+@dp.message_handler(commands=["top_10_authors_by_topic"], content_types=[types.ContentType.TEXT])
+async def topics(message: types.Message):
+    _, topic = message.text.split(' ', 1)
+    print(topic, file=sys.stderr)
+    with get_session() as session:
+        authors = top_10_authors(topic, session)
+    if len(authors):
+        for author in authors:
+            await message.reply(pprint.pformat(author, depth=2, indent=4)[1:-1])
+    else:
+        await message.reply("No such authors")
 
 
 if __name__ == "__main__":
