@@ -20,7 +20,7 @@ def get_recommended_paper_id(last_liked_paper: typing.Optional[dict], readed_pap
     for recommended_paper_id in candidate_paper_ids:
         if recommended_paper_id not in readed_papers:
             recommended_paper_ids.append(recommended_paper_id)
-        if len(recommended_paper_ids) >= 5:
+        if len(recommended_paper_ids) >= 30:
             return recommended_paper_ids
     return recommended_paper_ids
 

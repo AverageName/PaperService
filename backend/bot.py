@@ -6,10 +6,7 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.utils import executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.utils import markdown
-#from aiogram.dispatcher.filters.callback_data import CallbackData
-#from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.dispatcher.filters import Text
-#from magic_filter import F
 from db.crud import create_user
 from db.database import Base, engine, get_session
 from db.db_utils import *
@@ -19,27 +16,28 @@ import db.models
 import recommender
 
 
-# class FeedbackOnPaperCallbackFactory(CallbackData, prefix="feedback"):
-#     value: str
-
-
 def get_feedback_keyboard(paper_id: str):
-    # builder = InlineKeyboardBuilder()
-    # builder.button(
-    #     text="like", callback_data="feedback_like"#FeedbackOnPaperCallbackFactory(value="like")
-    # )
-    # builder.button(
-    #     text="dislike", callback_data="feedback_dislike"#FeedbackOnPaperCallbackFactory(value="dislike")
-    # )
-    # builder.adjust(2)
     buttons = [
         [
-            types.InlineKeyboardButton(text="like", callback_data=f"feedback_like_{paper_id}"),
-            types.InlineKeyboardButton(text="dislike", callback_data=f"feedback_dislike_{paper_id}")
+            types.InlineKeyboardButton(text="like",
+                                       callback_data=f"feedback_like_{paper_id}"),
+            types.InlineKeyboardButton(text="dislike",
+                                       callback_data=f"feedback_dislike_{paper_id}")
         ]
     ]
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
-    return keyboard #builder.as_markup()
+    return keyboard
+
+
+def get_menu_keyboard():
+    buttons = [
+        [types.KeyboardButton(text="What should i read next?")],
+        [types.KeyboardButton(text="Sign me up, please")]
+    ]
+    keyboard = types.ReplyKeyboardMarkup(keyboard=buttons,
+                                         resize_keyboard=True,
+                                         input_field_placeholder="Choose action")
+    return keyboard
 
 
 def paper_markdowner(paper: dict):
@@ -76,22 +74,52 @@ dp = Dispatcher(bot, storage=storage)
 
 @dp.message_handler(commands=["start", "help"])
 async def send_welcome(message: types.Message):
-    """
-    This handler will be called when user sends `/start` or `/help` command
-    """
-    await message.answer("""Welcome to paper service bot!\n
+    await message.reply("""Welcome to paper service bot!\n
 If you want to find paper by some parameter use command /find_by\n
 For example:\n
 /find_by year 2007 \n
 Currently this function supports year/name/topic\n
 If you want to find top-10 referenced authors in certain topic use command /top_10_authors_by_topic\n
+Possible topics:
+    Computer Science',
+    'Machine Leaning',
+    'Mathematics',
+    'Sport',
+    'Health',
+    'CyberSecurity',
+    'Games',
+    'Mobiles & Robots',
+    'Image & Video',
+    'Social',
 For example: \n
 /top_10_authors_by_topic Computer Science\n
-Amount of answers is limited to 20 for more usability""")
+Amount of answers is limited to 20 for more usability.\n
+To Call menu with buttons -- print /menu\n
+To get simple recommendations about papers, tap button below.\n
+If you want more precise recommendations, sign up firstly,
+so i will track your like-dislike feedbacks, carefully save it in my database
+and run more complex models to perfectly follow your tastes and match your personality,
+and i really will start thinking like you at some moment, so whatever you will do remember -- i see""",
+                        reply_markup=get_menu_keyboard(),
+                        parse_mode=types.ParseMode.MARKDOWN)
+
+
+@dp.message_handler(Text(equals="Sign me up, please", ignore_case=True),
+                    content_types=[types.ContentType.TEXT])
+async def signs_up_user(message: types.Message):
     with get_session() as session:
         if not check_user_exists(message.from_user.id, session):
-            await message.answer(f"You are not registered yet, I will add you to my database now")
+            await message.answer(f"You are not registered yet, I will add you to my database now."
+                                 "Dont worry, it's safe.")
             create_user(message.from_user.id, session)
+        else:
+            await message.answer("You are already signed")
+
+
+@dp.message_handler(commands=["menu"])
+async def send_welcome(message: types.Message):
+    await message.answer("Choose action, please", reply_markup=get_menu_keyboard(),
+                         parse_mode=types.ParseMode.MARKDOWN)
 
 
 @dp.message_handler(commands=["find_by"], content_types=[types.ContentType.TEXT])
@@ -105,7 +133,8 @@ async def find_by(message: types.Message):
         elif query == "topic":
             papers = find_by_topic(value, session)
     if len(papers):
-        for paper in random.shuffle(papers)[:5]:
+        random.shuffle(papers)
+        for paper in papers[:5]:
             await message.reply(paper_markdowner(paper),#pprint.pformat(paper, depth=3, indent=4)[1:-1],
                                 reply_markup=get_feedback_keyboard(paper["id"]),
                                 parse_mode=types.ParseMode.MARKDOWN)
@@ -126,7 +155,8 @@ async def topics(message: types.Message):
         await message.reply("No such authors")
 
 
-@dp.message_handler(commands=["what_should_i_read_next"], content_types=[types.ContentType.TEXT])
+@dp.message_handler(Text(equals="What should i read next?", ignore_case=True))
+@dp.message_handler(commands=["what_should_i_read_next"])
 async def recommend_paper(message: types.Message):
     with get_session() as session:
         last_liked_paper = None
@@ -147,9 +177,7 @@ async def recommend_paper(message: types.Message):
             if recommended_paper is not None:
                 break
         if recommended_paper is None:
-            await message.reply("Ups, something went wrong, we are already working on it"
-                                f"\n{len(recommended_paper_ids)}"
-                                f"\n{' '.join(recommended_paper_ids)}")
+            await message.reply("Ups, something went wrong, we are already working on it")
         else:
             await message.reply(paper_markdowner(recommended_paper.as_dict()),
                                 reply_markup=get_feedback_keyboard(recommended_paper_id),
@@ -170,54 +198,7 @@ async def callbacks_feedback_on_paper(
             if user.last_like_paper_id == paper_id:
                 update_by_id(user.id, {"last_like_paper_id": None}, "user", session)
             insert_user_paper_interaction(user.id, paper_id, False, session)
-        # for interaction in session.query(db.models.UserPaper):
-        #     paper = read_by_id(interaction.paper_id, "paper", session)
-        #     await callback.message.answer(f"user_id: {interaction.user_id}\n"
-        #                                   f"paper_id: {interaction.paper_id}\n"
-        #                                   f"paper_title: {paper.title}\n"
-        #                                   f"like: {interaction.like}\n"
-        #                                   f"ts: {interaction.ts}\n")
     await callback.answer()
-
-            # if user is not None:
-            #     await callback.message.answer(callback.message.text + '\nlike on ' + paper_id + \
-            #                                   '\nlast like prev:' + str(user.last_like_paper_id))
-            # user = session.query(db.models.User).filter_by(tg_id=callback.from_user.id).one_or_none()
-            # if user is not None:
-            #     await callback.message.answer(callback.message.text + '\nlike on ' + paper_id + \
-            #                                   '\nlast like curr:' + str(user.last_like_paper_id))
-            #user = session.query(db.models.User).filter_by(tg_id=callback.message.from_user.id).one_or_none()
-            #await callback.message.reply(f"Dis is you {user} {callback.message.from_user.id} {user is None}")
-            # await callback.message.answer(callback.message.text + '\nlike on ' + paper_id + \
-            #                               f"\nyour id: {callback.from_user.id}")
-            # if check_user_exists(callback.from_user.id, session):
-            #     # await callback.message.answer(callback.message.text + '\nlike on ' + paper_id + \
-            #     #                               '\nEboy last like is:')
-            #     # update_user_like(callback.message.from_user.id, paper_id, session)
-            #     for user in session.query(db.models.User):
-            #         print(user)
-            #         await callback.message.answer(callback.message.text+'\nlike on '+paper_id+\
-            #                                       '\nEboy last like is:'+str(user.last_like_paper_id))
-        # else if (feedback_value == "dislike" and user is not None):
-        #     update_by_id(user.id, {"last_like_paper_id": None}, "user", session)
-
-            # for user in session.query(db.models.User):
-            #     #print(user)
-            #     await callback.message.answer(callback.message.text+'\ndislike on '+paper_id+\
-            #                                   '\nEboy last like is:'+str(user.last_like_paper_id))
-    #await callback.answer()
-
-
-# @dp.callback_query(FeedbackOnPaperCallbackFactory.filter())
-# async def callbacks_feedback_on_paper(
-#         callback: types.CallbackQuery,
-#         callback_data: FeedbackOnPaperCallbackFactory
-# ):
-#     if callback_data.value == "like":
-#         await callback.message.answer(callback.message.text)
-#     else:
-#         await callback.message.answer(callback.message.text)
-#     await callback.answer()
 
 
 if __name__ == "__main__":

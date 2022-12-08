@@ -29,16 +29,6 @@ paper_paper = Table(
 )
 
 
-# user_paper = Table(
-#     "user_paper",
-#     Base.metadata,
-#     Column("user_id", ForeignKey("user.id"), primary_key=True),
-#     Column("paper_id", ForeignKey("paper.id"), primary_key=True),
-#     Column("like", Boolean, default=False),
-#     Column("ts", DateTime, default=datetime.datetime.utcnow)
-# )
-
-
 class Author(Base):
     __tablename__ = "author"
     id = Column(String(100), primary_key=True)
