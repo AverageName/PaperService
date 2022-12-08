@@ -139,11 +139,17 @@ async def recommend_paper(message: types.Message):
             user_interactions = session.query(db.models.UserPaper).filter_by(user_id=user.id)
             if user_interactions is not None:
                 readed_papers = [interaction.paper_id for interaction in user_interactions]
-        recommended_paper_id = recommender.get_recommended_paper_id(last_liked_paper,
-                                                                    readed_papers)
-        recommended_paper = session.query(db.models.Paper).filter_by(id=recommended_paper_id).one_or_none()
+        recommended_paper_ids = recommender.get_recommended_paper_id(last_liked_paper,
+                                                                     readed_papers)
+        recommended_paper = None
+        for recommended_paper_id in recommended_paper_ids:
+            recommended_paper = session.query(db.models.Paper).filter_by(id=recommended_paper_id).one_or_none()
+            if recommended_paper is not None:
+                break
         if recommended_paper is None:
-            await message.reply("Ups, something went wrong, we are already working on it")
+            await message.reply("Ups, something went wrong, we are already working on it"
+                                f"\n{len(recommended_paper_ids)}"
+                                f"\n{' '.join(recommended_paper_ids)}")
         else:
             await message.reply(paper_markdowner(recommended_paper.as_dict()),
                                 reply_markup=get_feedback_keyboard(recommended_paper_id),
