@@ -1,5 +1,7 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Table, BigInteger
+from sqlalchemy import (Column, ForeignKey, Integer, String, Table,
+                        BigInteger, Boolean, DateTime, TIMESTAMP)
 from sqlalchemy.orm import relationship
+import datetime
 
 from .database import Base
 
@@ -25,6 +27,16 @@ paper_paper = Table(
     Column("paper_id_1", ForeignKey("paper.id"), primary_key=True),
     Column("paper_id_2", ForeignKey("paper.id"), primary_key=True),
 )
+
+
+# user_paper = Table(
+#     "user_paper",
+#     Base.metadata,
+#     Column("user_id", ForeignKey("user.id"), primary_key=True),
+#     Column("paper_id", ForeignKey("paper.id"), primary_key=True),
+#     Column("like", Boolean, default=False),
+#     Column("ts", DateTime, default=datetime.datetime.utcnow)
+# )
 
 
 class Author(Base):
@@ -67,15 +79,15 @@ class Paper(Base):
     n_citations = Column(Integer, nullable=True)
     keywords = relationship("Keyword", secondary=paper_keyword, back_populates="papers")
     abstract = Column(String(100_000), nullable=True)
-    # to do: think about dropping it, it takes too much space
     url = Column(String(1_000_000), nullable=True)
+    # to do: think about dropping it, it takes too much space
     lang_id = Column(String(100), ForeignKey("lang.id"))
     lang = relationship("Lang", back_populates="papers")
     topic = Column(String(1_000), nullable=True)
     # references = relationship("Paper", secondary=paper_paper, back_populates='references')
 
     def as_dict(self):
-        dict_ = {c: getattr(self, c) for c in ["title", "year", "n_citations", "topic"]}
+        dict_ = {c: getattr(self, c) for c in ["id", "title", "year", "n_citations", "topic", "abstract", "url"]}
         dict_["authors"] = []
         for author in self.authors:
             dict_["authors"].append(author.as_dict())
@@ -84,5 +96,14 @@ class Paper(Base):
 
 class User(Base):
     __tablename__ = "user"
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, autoincrement=True) # Isn't tg_id enough?
     tg_id = Column(Integer, nullable=False)
+    last_like_paper_id = Column(String(100), nullable=True)
+
+
+class UserPaper(Base):
+    __tablename__ = "user_paper"
+    user_id = Column(ForeignKey("user.id"), primary_key=True)
+    paper_id = Column(ForeignKey("paper.id"), primary_key=True)
+    like = Column(Boolean, default=False)
+    ts = Column(DateTime, default=datetime.datetime.utcnow)

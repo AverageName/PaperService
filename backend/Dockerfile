@@ -4,6 +4,7 @@ COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 COPY db backend/db
 COPY topic_modeling backend/topic_modeling
+COPY recommender backend/recommender
 COPY create_database.py backend/create_database.py
 COPY drop_database.py backend/drop_database.py
 COPY fill_database.py backend/fill_database.py

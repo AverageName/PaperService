@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from topic_modeling.predict import predict_topic
 from . import models, schemas
-
+import datetime
 
 def create_by_str(datum: str, model, session: Session):
     entry = session.query(model).filter_by(id=datum).one_or_none()
@@ -86,6 +86,8 @@ def get_table(table_name: str):
         return models.Keyword
     if table_name == "lang":
         return models.Lang
+    if table_name == "user":
+        return models.User
 
     raise HTTPException(status_code=404, detail=f"table: {table_name} not found")
 
@@ -152,3 +154,15 @@ def create_user(tg_id, session):
     session.add(user)
     print("User has been created", file=sys.stderr)
     session.commit()
+
+
+def insert_user_paper_interaction(user_id: str, paper_id: str, like: bool, session: Session):
+    entry = session.query(models.UserPaper).filter_by(user_id=user_id, paper_id=paper_id).one_or_none()
+    if entry is None:
+        entry = models.UserPaper(user_id=user_id, paper_id=paper_id, like=like)
+        session.add(entry)
+    else:
+        entry.like = like
+        entry.ts = datetime.datetime.utcnow()
+    session.commit()
+    return entry

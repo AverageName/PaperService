@@ -10,3 +10,4 @@ ijson
 asyncio
 nltk
 sentence-transformers
+pandas

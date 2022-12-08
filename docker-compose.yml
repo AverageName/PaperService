@@ -7,7 +7,7 @@ services:
     build: backend/
     volumes:
       - type: bind
-        source: /Users/max/Downloads/PaperService/data
+        source: ${DATA_PATH}
         target: /data
     ports:
       - "5001:8000"

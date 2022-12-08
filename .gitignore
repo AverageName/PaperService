@@ -131,3 +131,11 @@ dmypy.json
 .vscode/
 jsons/
 *.json
+.idea/
+
+*.json
+*.csv
+allenai-specter/
+*.zip
+*.pt
+*.pkl
