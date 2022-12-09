@@ -1,0 +1,1 @@
+from topic_modeling.predict import predict_topic

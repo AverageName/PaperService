@@ -14,6 +14,8 @@ from db.crud import update_by_id, insert_user_paper_interaction, read_by_id
 import random
 import db.models
 import recommender
+from sqlalchemy import desc
+from topic_modeling import predict_topic
 
 
 def get_feedback_keyboard(paper_id: str):
@@ -32,7 +34,8 @@ def get_feedback_keyboard(paper_id: str):
 def get_menu_keyboard():
     buttons = [
         [types.KeyboardButton(text="What should i read next?")],
-        [types.KeyboardButton(text="Sign me up, please")]
+        [types.KeyboardButton(text="Hot papers")],
+        [types.KeyboardButton(text="Sign me up, please")],
     ]
     keyboard = types.ReplyKeyboardMarkup(keyboard=buttons,
                                          resize_keyboard=True,
@@ -75,12 +78,12 @@ dp = Dispatcher(bot, storage=storage)
 @dp.message_handler(commands=["start", "help"])
 async def send_welcome(message: types.Message):
     await message.reply("""Welcome to paper service bot!\n
-If you want to find paper by some parameter use command /find_by\n
-For example:\n
-/find_by year 2007 \n
+If you want to find paper by some parameter use command /find_by
+For example:
+/find_by year 2007
 Currently this function supports year/name/topic\n
-If you want to find top-10 referenced authors in certain topic use command /top_10_authors_by_topic\n
-Possible topics:
+If you want to find top-10 referenced authors in certain topic use command /top_10_authors_by_topic
+Possible topiGeoffrey E. Hintoncs:
     Computer Science',
     'Machine Leaning',
     'Mathematics',
@@ -91,17 +94,25 @@ Possible topics:
     'Mobiles & Robots',
     'Image & Video',
     'Social',
-For example: \n
+For example:
 /top_10_authors_by_topic Computer Science\n
+To get the topic for your paper, please, enter command /predict_topic with your paper title
+For example:
+/predict_topic A mathematical theory of communication\n
+If you want to find coauthor for an author, enter his name after command /find_coauthor
+For example:
+/find_coauthor Geoffrey E. Hinton\n
 Amount of answers is limited to 20 for more usability.\n
 To Call menu with buttons -- print /menu\n
-To get simple recommendations about papers, tap button below.\n
-If you want more precise recommendations, sign up firstly,
-so i will track your like-dislike feedbacks, carefully save it in my database
-and run more complex models to perfectly follow your tastes and match your personality,
-and i really will start thinking like you at some moment, so whatever you will do remember -- i see""",
-                        reply_markup=get_menu_keyboard(),
-                        parse_mode=types.ParseMode.MARKDOWN)
+Get trending papers -- tap `Hot papers` button\n
+To get simple recommendations about papers, tap `What should i read next?` button.\n
+If you want more precise recommendations, sign up firstly, so i will 
+track your like-dislike feedbacks, carefully save it in my database 
+and run more complex models to perfectly follow your tastes and 
+match your personality, and i really will start thinking like you 
+at some moment, so whatever you will do remember -- i see""",
+                        reply_markup=get_menu_keyboard(),)
+                        #parse_mode=types.ParseMode.MARKDOWN)
 
 
 @dp.message_handler(Text(equals="Sign me up, please", ignore_case=True),
@@ -143,7 +154,7 @@ async def find_by(message: types.Message):
 
 
 @dp.message_handler(commands=["top_10_authors_by_topic"], content_types=[types.ContentType.TEXT])
-async def topics(message: types.Message):
+async def top_authors_by_topic(message: types.Message):
     _, topic = message.text.split(' ', 1)
     print(topic, file=sys.stderr)
     with get_session() as session:
@@ -153,6 +164,43 @@ async def topics(message: types.Message):
             await message.reply(pprint.pformat(author, depth=2, indent=4)[1:-1])
     else:
         await message.reply("No such authors")
+
+
+@dp.message_handler(commands=["find_coauthor"], content_types=[types.ContentType.TEXT])
+async def get_coauthor_by_author(message: types.Message):
+    _, author_name = message.text.split(' ', 1)
+    with get_session() as session:
+        coauthor = get_coauthor(author_name, session)
+    if coauthor is not None:
+        await message.reply(coauthor.name)
+    else:
+        await message.reply(f"{author_name} has no coauthors")
+
+
+@dp.message_handler(commands=["predict_topic"], content_types=[types.ContentType.TEXT])
+async def predict_topic_by_title(message: types.Message):
+    _, title = message.text.split(' ', 1)
+    #print(title, file=sys.stderr)
+    topic = predict_topic([title])[0]
+    #print(topic, file=sys.stderr)
+    await message.reply(topic)
+
+
+@dp.message_handler(Text(equals="Hot papers", ignore_case=True))
+@dp.message_handler(commands=["hot_papers"])
+async def get_hot_papers(message: types.Message):
+    with get_session() as session:
+        num_papers = 5
+        sorted_papers_by_citation = session.query(db.models.Paper).order_by(db.models.Paper.n_citations)
+        if sorted_papers_by_citation is not None:
+            for paper_num, paper in enumerate(sorted_papers_by_citation):
+                await message.reply(paper_markdowner(paper.as_dict()),
+                                    reply_markup=get_feedback_keyboard(paper.id),
+                                    parse_mode=types.ParseMode.MARKDOWN)
+                if paper_num + 1 == num_papers:
+                    break
+        else:
+            await message.reply("Ups, something went wrong, we are already working on it")
 
 
 @dp.message_handler(Text(equals="What should i read next?", ignore_case=True))

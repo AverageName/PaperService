@@ -37,3 +37,13 @@ def top_10_authors(topic, session):
     if authors is not None:
         res = [author.as_dict() for author in authors]
     return res
+
+
+def get_coauthor(author_name, session):
+    author = session.query(Author).filter_by(name=author_name).one_or_none()
+    if author is not None:
+        for paper in author.papers:
+            for coauthor in paper.authors:
+                if coauthor.name != author.name:
+                    return coauthor
+    return None
