@@ -1,0 +1,2 @@
+CliendID: d24d6cb554f44bd1a6f3db3cd81f6827
+Client secret: 7871b90641834055a80be95273e1e718

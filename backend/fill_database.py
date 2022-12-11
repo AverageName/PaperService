@@ -1,13 +1,24 @@
 import argparse
 import asyncio
 import os
+import sys
 import re
+import pandas as pd
+from tqdm import tqdm
+import ast
 
 import aiofiles
 import ijson
 
 from db import crud, schemas
 from db.database import Base, engine, get_session
+
+
+COLNAMES = ["id", "title", "authors", "venue", "year", "keywords", "fos",
+            "references", "n_citation", "page_start", "page_end", "lang",
+            "volume", "issue", "issn", "isbn", "doi", "pdf", "url", "abstract"]
+
+CONTAINER_COLNAMES = ["venue", "authors", "keywords", "fos", "references", "url"]
 
 
 def prepare(input_file, output_file):
@@ -31,7 +42,7 @@ def remove_incomplete_attributes(paper: dict):
         authors[:] = [author for author in authors if "id" in author]
 
 
-async def parse_and_add_to_database(filename, session):
+async def parse_json_and_add_to_database(filename, session):
     json_file = await aiofiles.open(filename, "r")
     counter = 0
     async for paper in ijson.items(json_file, "item"):
@@ -47,7 +58,12 @@ async def parse_and_add_to_database(filename, session):
             break
 
 
-def fill_database(json_file):
+def fill_database_with_json(json_file):
+    if not os.path.isfile(json_file):
+        print("ERROR: JSON file path wrong, file does not exists!", file=sys.stderr)
+    else:
+        print("Yeah boy fisting time cumming", file=sys.stderr)
+
     Base.metadata.create_all(engine)
 
     head, tail = os.path.split(json_file)
@@ -59,10 +75,44 @@ def fill_database(json_file):
             prepare(input_file, output_file)
 
     with get_session() as session:
-        asyncio.run(parse_and_add_to_database(prepared_json, session))
+        asyncio.run(parse_json_and_add_to_database(prepared_json, session))
 
     engine.dispose()
 
+
+def parse_csv_and_add_to_database(filename, session):
+    df = pd.read_csv(filename)
+    for counter, paper in tqdm(enumerate(df.iterrows())):
+        if counter == 100:
+            break
+        paper = dict(paper[1])
+        #paper = {k: ast.literal_eval(v) if k in CONTAINER_COLUMNSS else v for k, v in paper.items()}
+        for k, v in paper.items():
+            try:
+                paper[k] = ast.literal_eval(v)
+            except (SyntaxError, ValueError):
+                continue
+            finally:
+                if k in CONTAINER_COLNAMES and not isinstance(paper[k], (list, dict, tuple)):
+                    paper[k] = list()
+        remove_incomplete_attributes(paper)
+        crud.create_paper(schemas.Paper(**paper), session)
+
+
+def fill_database_with_csv(csv_file):
+    Base.metadata.create_all(engine)
+    with get_session() as session:
+        parse_csv_and_add_to_database(csv_file, session)
+    engine.dispose()
+
+
+def fill_database(file):
+    print(file, file=sys.stderr)
+    print(os.path.splitext(file), file=sys.stderr)
+    if os.path.splitext(file)[-1] == ".csv":
+        fill_database_with_csv(file)
+    else:
+        fill_database_with_json(file)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
